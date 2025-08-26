@@ -76,7 +76,7 @@
     const photo = document.getElementById('photo');
     const responseDiv = document.getElementById('response');
 
-    // Start camera
+    // Start camera ....
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => video.srcObject = stream)
       .catch(err => console.error("Camera error:", err));
