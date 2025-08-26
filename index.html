@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Camera Classifier</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #f8fafc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 95%;
+      max-width: 480px;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 15px;
+      font-size: 1.6em;
+      color: #111827;
+    }
+    video, img {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 12px;
+      background: #000;
+    }
+    button {
+      margin-top: 15px;
+      padding: 14px 20px;
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: #fff;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    }
+    .response {
+      margin-top: 18px;
+      padding: 12px;
+      background: #f1f5f9;
+      border-radius: 12px;
+      font-size: 1em;
+      color: #374151;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📷 Camera Classifier</h1>
+    <video id="video" autoplay playsinline></video>
+    <button id="captureBtn">Capture & Classify</button>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <img id="photo" alt="Captured photo">
+    <div class="response" id="response"></div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const photo = document.getElementById('photo');
+    const responseDiv = document.getElementById('response');
+
+    // Start camera
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => video.srcObject = stream)
+      .catch(err => console.error("Camera error:", err));
+
+    document.getElementById('captureBtn').addEventListener('click', async () => {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageB64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      photo.src = "data:image/jpeg;base64," + imageB64;
+
+      try {
+        const res = await fetch("https://musical-umbrella-gjgx54576p63w6rr-8000.app.github.dev/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_b64: imageB64, return_reason: true })
+        });
+        const data = await res.json();
+        responseDiv.innerHTML = `
+          <strong>Label:</strong> ${data.label}<br>
+          <strong>Confidence:</strong> ${data.confidence}<br>
+          <strong>Reason:</strong> ${data.reason}
+        `;
+      } catch (err) {
+        responseDiv.textContent = "Error: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
