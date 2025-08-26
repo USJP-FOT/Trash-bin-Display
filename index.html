@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Camera Classifier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
       margin: 0;
@@ -22,11 +23,7 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.1);
       text-align: center;
     }
-    h1 {
-      margin: 0 0 15px;
-      font-size: 1.6em;
-      color: #111827;
-    }
+    h1 { margin: 0 0 15px; font-size: 1.6em; color: #111827; }
     video, img {
       width: 100%;
       border-radius: 12px;
@@ -46,9 +43,7 @@
       cursor: pointer;
       transition: 0.3s;
     }
-    button:hover {
-      background: linear-gradient(135deg, #1d4ed8, #2563eb);
-    }
+    button:hover { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
     .response {
       margin-top: 18px;
       padding: 12px;
@@ -63,7 +58,8 @@
 <body>
   <div class="container">
     <h1>📷 Camera Classifier</h1>
-    <video id="video" autoplay playsinline></video>
+    <!-- playsinline stops iOS from forcing fullscreen; muted helps autoplay on some Androids -->
+    <video id="video" autoplay playsinline muted></video>
     <button id="captureBtn">Capture & Classify</button>
     <canvas id="canvas" style="display:none;"></canvas>
     <img id="photo" alt="Captured photo">
@@ -76,10 +72,32 @@
     const photo = document.getElementById('photo');
     const responseDiv = document.getElementById('response');
 
-    // Start camera ....
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => video.srcObject = stream)
-      .catch(err => console.error("Camera error:", err));
+    // ----- Start camera: prefer back (environment) camera -----
+    (async () => {
+      try {
+        // 1) Try strict environment camera
+        const envConstraints = { video: { facingMode: { exact: "environment" } } };
+        const stream = await navigator.mediaDevices.getUserMedia(envConstraints);
+        video.srcObject = stream;
+      } catch (e1) {
+        try {
+          // 2) If strict fails, try best-effort environment
+          const fallbackConstraints = { video: { facingMode: "environment" } };
+          const stream2 = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          video.srcObject = stream2;
+        } catch (e2) {
+          try {
+            // 3) Final fallback: just give me any camera
+            const anyStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = anyStream;
+          } catch (err) {
+            console.error("Camera error:", err);
+            responseDiv.textContent = "Unable to access the camera. Check browser permissions/HTTPS.";
+          }
+        }
+      }
+    })();
+    // ----------------------------------------------------------
 
     document.getElementById('captureBtn').addEventListener('click', async () => {
       const ctx = canvas.getContext('2d');
@@ -87,15 +105,20 @@
       canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const imageB64 = canvas.toDataURL('image/jpeg').split(',')[1];
+      // Use slight JPEG compression to reduce payload size
+      const imageB64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
       photo.src = "data:image/jpeg;base64," + imageB64;
 
       try {
         const res = await fetch("https://musical-umbrella-gjgx54576p63w6rr-8000.app.github.dev/classify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
           body: JSON.stringify({ image_b64: imageB64, return_reason: true })
         });
+        if (!res.ok) {
+          const t = await res.text().catch(()=> "");
+          throw new Error(`HTTP ${res.status} ${res.statusText} ${t}`);
+        }
         const data = await res.json();
         responseDiv.innerHTML = `
           <strong>Label:</strong> ${data.label}<br>
