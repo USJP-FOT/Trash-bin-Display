@@ -58,7 +58,6 @@
 <body>
   <div class="container">
     <h1>📷 Camera Classifier</h1>
-    <!-- playsinline stops iOS from forcing fullscreen; muted helps autoplay............. on some Androids -->
     <video id="video" autoplay playsinline muted></video>
     <button id="captureBtn">Capture & Classify</button>
     <canvas id="canvas" style="display:none;"></canvas>
@@ -72,22 +71,19 @@
     const photo = document.getElementById('photo');
     const responseDiv = document.getElementById('response');
 
-    // ----- Start camera: prefer back (environment) camera -----
+    // ----- Start camera -----
     (async () => {
       try {
-        // 1) Try strict environment camera
         const envConstraints = { video: { facingMode: { exact: "environment" } } };
         const stream = await navigator.mediaDevices.getUserMedia(envConstraints);
         video.srcObject = stream;
       } catch (e1) {
         try {
-          // 2) If strict fails, try best-effort environment
           const fallbackConstraints = { video: { facingMode: "environment" } };
           const stream2 = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
           video.srcObject = stream2;
         } catch (e2) {
           try {
-            // 3) Final fallback: just give me any camera
             const anyStream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = anyStream;
           } catch (err) {
@@ -110,9 +106,13 @@
       photo.src = "data:image/jpeg;base64," + imageB64;
 
       try {
-        const res = await fetch("https://musical-umbrella-gjgx54576p63w6rr-8000.app.github.dev/classify", {
+        const res = await fetch("https://physically-holy-longhorn.ngrok-free.app/classify", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          headers: { 
+            "Content-Type": "application/json", 
+            "Accept": "application/json",
+            "ngrok-skip-browser-warning": "true"  // 🔑 bypass ngrok warning
+          },
           body: JSON.stringify({ image_b64: imageB64, return_reason: true })
         });
         if (!res.ok) {
@@ -125,8 +125,10 @@
           <strong>Confidence:</strong> ${data.confidence}<br>
           <strong>Reason:</strong> ${data.reason}
         `;
+        console.log("API Response:", data);
       } catch (err) {
         responseDiv.textContent = "Error: " + err.message;
+        console.error("Fetch error:", err);
       }
     });
   </script>
